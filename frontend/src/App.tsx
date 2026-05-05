@@ -356,11 +356,9 @@ function Admin() {
 
   const fetchServers = async () => {
     try {
-      console.log("ADMIN SECRET:", secret);
       const res = await fetch(`${API_URL}/admin/servers/${tab}`, {
         method: "GET",
         headers: {
-          "Content-Type": "application/json",
           "secret": secret
         }
       });
@@ -383,15 +381,19 @@ function Admin() {
 
   const handleAction = async (id: string, action: string, body?: any) => {
     try {
-      console.log("ADMIN SECRET:", secret);
+      const headers: HeadersInit = { "secret": secret };
+      if (body) {
+        headers["Content-Type"] = "application/json";
+      }
+
       const options: RequestInit = {
         method: action === 'delete' ? 'DELETE' : 'PATCH',
-        headers: {
-          "Content-Type": "application/json",
-          "secret": secret
-        },
+        headers,
       };
-      if (body) options.body = JSON.stringify(body);
+      
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
 
       const endpoint = action === 'delete' ? `/servers/${id}` : `/servers/${id}/${action}`;
       
