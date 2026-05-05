@@ -2,9 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL
-});
+const prisma = new PrismaClient();
 const fastify = Fastify({ logger: true });
 
 fastify.register(cors, {
