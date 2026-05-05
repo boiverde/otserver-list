@@ -356,8 +356,13 @@ function Admin() {
 
   const fetchServers = async () => {
     try {
+      console.log("ADMIN SECRET:", secret);
       const res = await fetch(`${API_URL}/admin/servers/${tab}`, {
-        headers: { secret }
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "secret": secret
+        }
       });
       if (res.status === 401) {
         setIsAuthenticated(false);
@@ -378,9 +383,13 @@ function Admin() {
 
   const handleAction = async (id: string, action: string, body?: any) => {
     try {
+      console.log("ADMIN SECRET:", secret);
       const options: RequestInit = {
         method: action === 'delete' ? 'DELETE' : 'PATCH',
-        headers: { secret, 'Content-Type': 'application/json' },
+        headers: {
+          "Content-Type": "application/json",
+          "secret": secret
+        },
       };
       if (body) options.body = JSON.stringify(body);
 
