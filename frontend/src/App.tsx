@@ -420,10 +420,12 @@ function Admin() {
         setEditingServer(null);
         fetchServers();
       } else {
-        alert('Erro ao salvar.');
+        const text = await res.text();
+        alert(`Erro ao salvar: ${res.status} ${text}`);
       }
     } catch (err) {
       console.error(err);
+      alert(`Erro de conexão: ${err}`);
     }
   };
 

@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { PrismaClient } from '@prisma/client';
-
+import { checkServerStatus } from './statusChecker.js';
 const prisma = new PrismaClient();
 const fastify = Fastify({ logger: true });
 
@@ -154,11 +154,16 @@ fastify.patch('/admin/servers/:id', async (request, reply) => {
   if (data.isFeatured !== undefined) updateData.isFeatured = Boolean(data.isFeatured);
   if (data.approved !== undefined) updateData.approved = Boolean(data.approved);
 
-  const server = await prisma.server.update({
-    where: { id },
-    data: updateData,
-  });
-  return server;
+  try {
+    const server = await prisma.server.update({
+      where: { id },
+      data: updateData,
+    });
+    return server;
+  } catch (error) {
+    console.error('Update server error:', error);
+    return reply.status(500).send({ error: 'Erro ao salvar no banco de dados' });
+  }
 });
 
 fastify.post('/admin/servers/test-status', async (request, reply) => {
@@ -172,8 +177,7 @@ fastify.post('/admin/servers/test-status', async (request, reply) => {
   return status;
 });
 
-import { checkServerStatus } from './statusChecker.js';
-
+// removed
 fastify.post('/admin/servers/:id/check', async (request, reply) => {
   const { secret } = request.headers as { secret?: string };
   if (secret !== process.env.ADMIN_SECRET) return reply.status(401).send({ error: 'Unauthorized' });
