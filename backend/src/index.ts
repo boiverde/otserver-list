@@ -17,7 +17,9 @@ fastify.get('/servers', async (request, reply) => {
     },
     orderBy: [
       { isFeatured: 'desc' },
+      { isOnline: 'desc' },
       { playersOnline: 'desc' },
+      { updatedAt: 'desc' },
     ],
   });
   return servers;

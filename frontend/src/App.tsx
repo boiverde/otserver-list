@@ -46,12 +46,17 @@ function Navbar() {
   );
 }
 
-function ServerCard({ server }: { server: ServerData }) {
+function ServerCard({ server, isTop3 }: { server: ServerData, isTop3?: boolean }) {
   return (
-    <div className={`server-card ${server.isFeatured ? 'featured' : ''}`}>
+    <div className={`server-card ${server.isFeatured ? 'featured' : ''} ${isTop3 ? 'top3' : ''}`} style={isTop3 && !server.isFeatured ? { border: '1px solid #eab308' } : {}}>
       {server.isFeatured && (
         <div className="featured-badge">
           <Crown size={12} style={{ display: 'inline', marginRight: '4px' }} /> Premium
+        </div>
+      )}
+      {isTop3 && !server.isFeatured && (
+        <div className="featured-badge" style={{ backgroundColor: '#eab308', color: '#000' }}>
+          🔥 Em Alta
         </div>
       )}
       <div className="server-header">
@@ -70,7 +75,7 @@ function ServerCard({ server }: { server: ServerData }) {
         </div>
         <div className="stat-item">
           <Users size={16} />
-          <span>Players: <span className="stat-value">{server.playersOnline} / {server.maxPlayers}</span></span>
+          <span>Players: <span className="stat-value">{server.playersOnline} {server.maxPlayers > 0 ? `/ ${server.maxPlayers}` : ''}</span></span>
         </div>
       </div>
 
@@ -85,9 +90,9 @@ function ServerCard({ server }: { server: ServerData }) {
         </div>
         {server.lastCheckedAt && (
           <div className="detail-item" style={{ marginTop: '0.5rem', width: '100%', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
-            <span className="detail-label" style={{fontSize: '0.8rem'}}>Atualizado</span>
+            <span className="detail-label" style={{fontSize: '0.8rem'}}>Players online reais</span>
             <span className="detail-value" style={{fontSize: '0.8rem'}}>
-              {Math.floor((new Date().getTime() - new Date(server.lastCheckedAt).getTime()) / 60000)} min atrás
+              Atualizado há {Math.floor((new Date().getTime() - new Date(server.lastCheckedAt).getTime()) / 60000)} min
             </span>
           </div>
         )}
@@ -165,9 +170,16 @@ function Home() {
           </div>
         ) : (
           <div className="server-grid">
-            {servers.map(server => (
-              <ServerCard key={server.id} server={server} />
-            ))}
+            {(() => {
+              const top3Ids = [...servers]
+                .sort((a, b) => b.playersOnline - a.playersOnline)
+                .slice(0, 3)
+                .map(s => s.id);
+              
+              return servers.map(server => (
+                <ServerCard key={server.id} server={server} isTop3={top3Ids.includes(server.id)} />
+              ));
+            })()}
           </div>
         )}
       </main>
