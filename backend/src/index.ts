@@ -129,10 +129,108 @@ fastify.delete('/servers/:id', async (request, reply) => {
   return { success: true };
 });
 
+// --- STATUS CHECK ENDPOINTS ---
+
+import { checkServerStatus } from './statusChecker.js';
+
+fastify.post('/admin/servers/:id/check', async (request, reply) => {
+  const { secret } = request.headers as { secret?: string };
+  if (secret !== process.env.ADMIN_SECRET) return reply.status(401).send({ error: 'Unauthorized' });
+
+  const { id } = request.params as { id: string };
+  const server = await prisma.server.findUnique({ where: { id } });
+  
+  if (!server) return reply.status(404).send({ error: 'Server not found' });
+
+  const status = await checkServerStatus(server.ip, server.port);
+  
+  const updated = await prisma.server.update({
+    where: { id },
+    data: {
+      isOnline: status.isOnline,
+      playersOnline: status.isOnline ? status.playersOnline : server.playersOnline,
+      maxPlayers: status.isOnline ? status.maxPlayers : server.maxPlayers,
+      statusError: status.error || null,
+      lastCheckedAt: new Date()
+    }
+  });
+
+  return updated;
+});
+
+fastify.post('/admin/servers/check-all', async (request, reply) => {
+  const { secret } = request.headers as { secret?: string };
+  if (secret !== process.env.ADMIN_SECRET) return reply.status(401).send({ error: 'Unauthorized' });
+
+  const servers = await prisma.server.findMany({ where: { approved: true } });
+  let onlineCount = 0;
+  let offlineCount = 0;
+  let failedCount = 0;
+
+  // Process in batches of 3
+  for (let i = 0; i < servers.length; i += 3) {
+    const batch = servers.slice(i, i + 3);
+    await Promise.all(batch.map(async (server) => {
+      try {
+        const status = await checkServerStatus(server.ip, server.port);
+        await prisma.server.update({
+          where: { id: server.id },
+          data: {
+            isOnline: status.isOnline,
+            playersOnline: status.isOnline ? status.playersOnline : server.playersOnline,
+            maxPlayers: status.isOnline ? status.maxPlayers : server.maxPlayers,
+            statusError: status.error || null,
+            lastCheckedAt: new Date()
+          }
+        });
+        if (status.isOnline) onlineCount++;
+        else offlineCount++;
+      } catch (err) {
+        failedCount++;
+      }
+    }));
+  }
+
+  return { total: servers.length, online: onlineCount, offline: offlineCount, failed: failedCount };
+});
+
 const start = async () => {
   try {
     await fastify.listen({ port: process.env.PORT ? parseInt(process.env.PORT) : 3000, host: '0.0.0.0' });
     console.log(`Server is running on port ${process.env.PORT || 3000}`);
+    
+    // Auto status check every 5 minutes
+    setInterval(async () => {
+      try {
+        console.log('Running auto status check...');
+        const servers = await prisma.server.findMany({ where: { approved: true } });
+        let onlineCount = 0;
+        let offlineCount = 0;
+        
+        for (let i = 0; i < servers.length; i += 3) {
+          const batch = servers.slice(i, i + 3);
+          await Promise.all(batch.map(async (server) => {
+            const status = await checkServerStatus(server.ip, server.port);
+            await prisma.server.update({
+              where: { id: server.id },
+              data: {
+                isOnline: status.isOnline,
+                playersOnline: status.isOnline ? status.playersOnline : server.playersOnline,
+                maxPlayers: status.isOnline ? status.maxPlayers : server.maxPlayers,
+                statusError: status.error || null,
+                lastCheckedAt: new Date()
+              }
+            });
+            if (status.isOnline) onlineCount++;
+            else offlineCount++;
+          }));
+        }
+        console.log(`Auto check finished: ${servers.length} total, ${onlineCount} online, ${offlineCount} offline.`);
+      } catch (err) {
+        console.error('Auto status check failed', err);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

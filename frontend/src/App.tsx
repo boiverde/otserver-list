@@ -18,6 +18,9 @@ interface ServerData {
   maxPlayers: number;
   isFeatured: boolean;
   approved: boolean;
+  isOnline?: boolean;
+  lastCheckedAt?: string;
+  statusError?: string;
   ownerEmail: string;
 }
 
@@ -62,8 +65,8 @@ function ServerCard({ server }: { server: ServerData }) {
       
       <div className="server-stats">
         <div className="stat-item">
-          <Activity size={16} className="stat-online" />
-          <span>Status: <span className="stat-online">Online</span></span>
+          <Activity size={16} className={server.isOnline ? "stat-online" : "stat-offline"} style={!server.isOnline ? {color: '#ff4b4b'} : {}} />
+          <span>Status: <span className={server.isOnline ? "stat-online" : "stat-offline"} style={!server.isOnline ? {color: '#ff4b4b'} : {}}>{server.isOnline ? 'Online' : 'Offline'}</span></span>
         </div>
         <div className="stat-item">
           <Users size={16} />
@@ -80,6 +83,14 @@ function ServerCard({ server }: { server: ServerData }) {
           <span className="detail-label">Tipo</span>
           <span className="detail-value">{server.type}</span>
         </div>
+        {server.lastCheckedAt && (
+          <div className="detail-item" style={{ marginTop: '0.5rem', width: '100%', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
+            <span className="detail-label" style={{fontSize: '0.8rem'}}>Atualizado</span>
+            <span className="detail-value" style={{fontSize: '0.8rem'}}>
+              {Math.floor((new Date().getTime() - new Date(server.lastCheckedAt).getTime()) / 60000)} min atrás
+            </span>
+          </div>
+        )}
       </div>
 
       <Link to={`/server/${server.id}`} className="btn btn-secondary w-full text-center mt-4" style={{ justifyContent: 'center' }}>
@@ -408,6 +419,35 @@ function Admin() {
     }
   };
 
+  const handleCheck = async (id: string) => {
+    try {
+      const res = await fetch(`${API_URL}/admin/servers/${id}/check`, {
+        method: 'POST',
+        headers: { secret }
+      });
+      if (res.ok) fetchServers();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCheckAll = async () => {
+    try {
+      alert("Iniciando checagem de todos os servidores. Isso pode demorar um pouco.");
+      const res = await fetch(`${API_URL}/admin/servers/check-all`, {
+        method: 'POST',
+        headers: { secret }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Checagem concluída!\nTotal: ${data.total}\nOnline: ${data.online}\nOffline: ${data.offline}\nFalhas: ${data.failed}`);
+        fetchServers();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="app-container">
@@ -446,6 +486,9 @@ function Admin() {
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
           <button className={`btn ${tab === 'pending' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('pending')}>Pendentes</button>
           <button className={`btn ${tab === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('all')}>Todos os Servidores</button>
+          <button className="btn btn-secondary" style={{marginLeft: 'auto', backgroundColor: '#3b82f6', color: '#fff'}} onClick={handleCheckAll}>
+            <Activity size={18} style={{marginRight: '0.5rem'}} /> Atualizar Todos
+          </button>
         </div>
 
         <div style={{ overflowX: 'auto', backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)' }}>
@@ -471,13 +514,21 @@ function Admin() {
                   <td style={{ padding: '1rem' }}>
                     {!server.approved ? (
                       <span style={{ color: 'var(--danger)' }}>Pendente</span>
-                    ) : server.isFeatured ? (
-                      <span style={{ color: 'var(--featured)' }}>Premium</span>
                     ) : (
-                      <span style={{ color: 'var(--success)' }}>Aprovado</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        {server.isFeatured && <span style={{ color: 'var(--featured)', fontSize: '0.8rem' }}>⭐ Premium</span>}
+                        <span style={{ color: server.isOnline ? 'var(--success)' : 'var(--danger)', fontSize: '0.9rem' }}>
+                          {server.isOnline ? `Online (${server.playersOnline})` : 'Offline'}
+                        </span>
+                      </div>
                     )}
                   </td>
-                  <td style={{ padding: '1rem', textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                  <td style={{ padding: '1rem', textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    {server.approved && (
+                      <button className="btn" style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.4rem' }} title="Atualizar Status" onClick={() => handleCheck(server.id)}>
+                        <Activity size={16} />
+                      </button>
+                    )}
                     {!server.approved && (
                       <button className="btn" style={{ backgroundColor: 'var(--success)', color: 'white', padding: '0.4rem' }} title="Aprovar" onClick={() => handleAction(server.id, 'approve')}>
                         <Check size={16} />

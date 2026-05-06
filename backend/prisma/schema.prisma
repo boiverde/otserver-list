@@ -20,6 +20,9 @@ model Server {
   maxPlayers    Int      @default(0)
   isFeatured    Boolean  @default(false)
   approved      Boolean  @default(false)
+  isOnline      Boolean  @default(false)
+  lastCheckedAt DateTime?
+  statusError   String?
   ownerEmail    String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
