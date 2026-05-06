@@ -45,27 +45,41 @@ export async function checkServerStatus(ipStr: string, port: number, timeoutMs =
 
     client.on('data', (data) => {
       dataBuffer += data.toString();
+      
+      // Some servers do not close the connection after sending info
+      if (dataBuffer.includes('</tsq>') || dataBuffer.includes('</tsqp>') || dataBuffer.includes('</serverinfo>')) {
+        client.destroy();
+        clearTimeout(timeout);
+        
+        try {
+          // Parse XML looking for <players online="X" ... max="Y" ... />
+          const onlineMatch = dataBuffer.match(/online="(\d+)"/i);
+          const maxMatch = dataBuffer.match(/max="(\d+)"/i);
+
+          // Fallback for older formats like players="X" maxplayers="Y"
+          const fallbackPlayers = dataBuffer.match(/players="(\d+)"/i);
+          const fallbackMax = dataBuffer.match(/maxplayers="(\d+)"/i);
+
+          const players = onlineMatch ? parseInt(onlineMatch[1], 10) : (fallbackPlayers ? parseInt(fallbackPlayers[1], 10) : null);
+          const max = maxMatch ? parseInt(maxMatch[1], 10) : (fallbackMax ? parseInt(fallbackMax[1], 10) : null);
+
+          if (players !== null && max !== null) {
+            resolve({
+              isOnline: true,
+              playersOnline: players,
+              maxPlayers: max,
+            });
+          } else {
+            resolve({ isOnline: false, playersOnline: 0, maxPlayers: 0, error: 'Invalid response format' });
+          }
+        } catch (err) {
+          resolve({ isOnline: false, playersOnline: 0, maxPlayers: 0, error: 'Parse error' });
+        }
+      }
     });
 
     client.on('end', () => {
-      clearTimeout(timeout);
-      try {
-        // Parse basic XML
-        const playersMatch = dataBuffer.match(/players="(\d+)"/i);
-        const maxPlayersMatch = dataBuffer.match(/maxplayers="(\d+)"/i);
-
-        if (playersMatch && maxPlayersMatch) {
-          resolve({
-            isOnline: true,
-            playersOnline: parseInt(playersMatch[1], 10),
-            maxPlayers: parseInt(maxPlayersMatch[1], 10),
-          });
-        } else {
-          resolve({ isOnline: false, playersOnline: 0, maxPlayers: 0, error: 'Invalid response format' });
-        }
-      } catch (err) {
-        resolve({ isOnline: false, playersOnline: 0, maxPlayers: 0, error: 'Parse error' });
-      }
+      // Handled in data event
     });
   });
 }
