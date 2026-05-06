@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Server, Plus, Shield, Users, Activity, Crown, Copy, ExternalLink, Check, Trash2, Star, StarOff } from 'lucide-react';
+import { Server, Plus, Shield, Users, Activity, Crown, Copy, ExternalLink, Check, Trash2, Star, StarOff, Edit2 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const WHATSAPP_URL = import.meta.env.VITE_WHATSAPP_URL || 'https://wa.me/5511999999999?text=Gostaria%20de%20destacar%20meu%20servidor';
@@ -47,6 +47,8 @@ function Navbar() {
 }
 
 function ServerCard({ server, isTop3 }: { server: ServerData, isTop3?: boolean }) {
+  const visuallyOnline = server.isOnline || server.playersOnline > 0;
+
   return (
     <div className={`server-card ${server.isFeatured ? 'featured' : ''} ${isTop3 ? 'top3' : ''}`} style={isTop3 && !server.isFeatured ? { border: '1px solid #eab308' } : {}}>
       {server.isFeatured && (
@@ -70,8 +72,8 @@ function ServerCard({ server, isTop3 }: { server: ServerData, isTop3?: boolean }
       
       <div className="server-stats">
         <div className="stat-item">
-          <Activity size={16} className={server.isOnline ? "stat-online" : "stat-offline"} style={!server.isOnline ? {color: '#ff4b4b'} : {}} />
-          <span>Status: <span className={server.isOnline ? "stat-online" : "stat-offline"} style={!server.isOnline ? {color: '#ff4b4b'} : {}}>{server.isOnline ? 'Online' : 'Offline'}</span></span>
+          <Activity size={16} className={visuallyOnline ? "stat-online" : "stat-offline"} style={!visuallyOnline ? {color: '#ff4b4b'} : {}} />
+          <span>Status: <span className={visuallyOnline ? "stat-online" : "stat-offline"} style={!visuallyOnline ? {color: '#ff4b4b'} : {}}>{visuallyOnline ? 'Online' : 'Offline'}</span></span>
         </div>
         <div className="stat-item">
           <Users size={16} />
@@ -402,6 +404,44 @@ function Admin() {
     if (secret) fetchServers();
   }, [tab]);
 
+  const [editingServer, setEditingServer] = useState<ServerData | null>(null);
+  const [testResult, setTestResult] = useState<any>(null);
+
+  const handleEditSave = async () => {
+    if (!editingServer) return;
+    try {
+      const res = await fetch(`${API_URL}/admin/servers/${editingServer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', secret },
+        body: JSON.stringify(editingServer)
+      });
+      if (res.ok) {
+        alert('Salvo com sucesso!');
+        setEditingServer(null);
+        fetchServers();
+      } else {
+        alert('Erro ao salvar.');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const testPort = async (ip: string, port: number) => {
+    try {
+      setTestResult({ loading: true, port });
+      const res = await fetch(`${API_URL}/admin/servers/test-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', secret },
+        body: JSON.stringify({ ip, port })
+      });
+      const data = await res.json();
+      setTestResult({ ...data, port, loading: false });
+    } catch (err) {
+      setTestResult({ error: 'Erro de conexão', port, loading: false });
+    }
+  };
+
   const handleAction = async (id: string, action: string, body?: any) => {
     try {
       const headers: HeadersInit = { "secret": secret };
@@ -504,6 +544,7 @@ function Admin() {
         </div>
 
         <div style={{ overflowX: 'auto', backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+          {/* ... table ... */}
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
@@ -551,6 +592,9 @@ function Admin() {
                         {server.isFeatured ? <StarOff size={16} /> : <Star size={16} />}
                       </button>
                     )}
+                    <button className="btn" style={{ backgroundColor: 'var(--primary)', color: 'white', padding: '0.4rem' }} title="Editar" onClick={() => { setEditingServer(server); setTestResult(null); }}>
+                      <Edit2 size={16} />
+                    </button>
                     <button className="btn" style={{ backgroundColor: 'var(--danger)', color: 'white', padding: '0.4rem' }} title="Excluir" onClick={() => { if(confirm('Tem certeza?')) handleAction(server.id, 'delete'); }}>
                       <Trash2 size={16} />
                     </button>
@@ -565,6 +609,82 @@ function Admin() {
             </tbody>
           </table>
         </div>
+
+        {editingServer && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ backgroundColor: 'var(--bg-card)', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                <h3>Editar Servidor</h3>
+                <button className="btn" onClick={() => setEditingServer(null)}>Fechar</button>
+              </div>
+
+              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
+                <div>
+                  <label>Nome</label>
+                  <input className="form-control" value={editingServer.name} onChange={e => setEditingServer({...editingServer, name: e.target.value})} />
+                </div>
+                <div>
+                  <label>Email</label>
+                  <input className="form-control" value={editingServer.ownerEmail} onChange={e => setEditingServer({...editingServer, ownerEmail: e.target.value})} />
+                </div>
+                <div>
+                  <label>IP</label>
+                  <input className="form-control" value={editingServer.ip} onChange={e => setEditingServer({...editingServer, ip: e.target.value})} />
+                </div>
+                <div>
+                  <label>Porta</label>
+                  <input type="number" className="form-control" value={editingServer.port} onChange={e => setEditingServer({...editingServer, port: parseInt(e.target.value)})} />
+                </div>
+                <div>
+                  <label>Versão</label>
+                  <input className="form-control" value={editingServer.version} onChange={e => setEditingServer({...editingServer, version: e.target.value})} />
+                </div>
+                <div>
+                  <label>Tipo</label>
+                  <input className="form-control" value={editingServer.type} onChange={e => setEditingServer({...editingServer, type: e.target.value})} />
+                </div>
+              </div>
+
+              <div style={{ marginTop: '1.5rem' }}>
+                <label>Website</label>
+                <input className="form-control" value={editingServer.website || ''} onChange={e => setEditingServer({...editingServer, website: e.target.value})} />
+              </div>
+
+              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+                <button className="btn btn-secondary" onClick={() => testPort(editingServer.ip, 7171)}>Testar 7171</button>
+                <button className="btn btn-secondary" onClick={() => testPort(editingServer.ip, 7172)}>Testar 7172</button>
+                <button className="btn btn-secondary" onClick={() => testPort(editingServer.ip, 7173)}>Testar 7173</button>
+              </div>
+
+              {testResult && (
+                <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                  {testResult.loading ? (
+                    <span>Testando porta {testResult.port}...</span>
+                  ) : testResult.error ? (
+                    <span style={{color: 'var(--danger)'}}>Porta {testResult.port} falhou: {testResult.error}</span>
+                  ) : (
+                    <div>
+                      <strong>Porta {testResult.port}:</strong> 
+                      <span style={{ color: testResult.isOnline ? 'var(--success)' : 'var(--danger)', marginLeft: '0.5rem' }}>
+                        {testResult.isOnline ? 'Online' : 'Offline'}
+                      </span>
+                      {testResult.isOnline && ` (${testResult.playersOnline} players)`}
+                      {testResult.isOnline && (
+                        <button className="btn btn-primary" style={{marginLeft: '1rem', padding: '0.2rem 0.5rem'}} onClick={() => setEditingServer({...editingServer, port: testResult.port})}>
+                          Usar esta porta
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-primary" onClick={handleEditSave}>Salvar Alterações</button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

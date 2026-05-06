@@ -131,7 +131,46 @@ fastify.delete('/servers/:id', async (request, reply) => {
   return { success: true };
 });
 
-// --- STATUS CHECK ENDPOINTS ---
+fastify.patch('/admin/servers/:id', async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const { secret } = request.headers as { secret?: string };
+
+  if (secret !== process.env.ADMIN_SECRET) {
+    return reply.status(401).send({ error: 'Unauthorized' });
+  }
+
+  const data = request.body as any;
+  const updateData: any = {};
+  
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.ip !== undefined) updateData.ip = data.ip;
+  if (data.port !== undefined) updateData.port = Number(data.port);
+  if (data.version !== undefined) updateData.version = data.version;
+  if (data.type !== undefined) updateData.type = data.type;
+  if (data.website !== undefined) updateData.website = data.website;
+  if (data.ownerEmail !== undefined) updateData.ownerEmail = data.ownerEmail;
+  if (data.playersOnline !== undefined) updateData.playersOnline = Number(data.playersOnline);
+  if (data.maxPlayers !== undefined) updateData.maxPlayers = Number(data.maxPlayers);
+  if (data.isFeatured !== undefined) updateData.isFeatured = Boolean(data.isFeatured);
+  if (data.approved !== undefined) updateData.approved = Boolean(data.approved);
+
+  const server = await prisma.server.update({
+    where: { id },
+    data: updateData,
+  });
+  return server;
+});
+
+fastify.post('/admin/servers/test-status', async (request, reply) => {
+  const { secret } = request.headers as { secret?: string };
+  if (secret !== process.env.ADMIN_SECRET) return reply.status(401).send({ error: 'Unauthorized' });
+
+  const { ip, port } = request.body as { ip: string, port: number };
+  if (!ip || !port) return reply.status(400).send({ error: 'IP and port required' });
+
+  const status = await checkServerStatus(ip, Number(port));
+  return status;
+});
 
 import { checkServerStatus } from './statusChecker.js';
 
@@ -150,8 +189,8 @@ fastify.post('/admin/servers/:id/check', async (request, reply) => {
     where: { id },
     data: {
       isOnline: status.isOnline,
-      playersOnline: status.isOnline ? status.playersOnline : server.playersOnline,
-      maxPlayers: status.isOnline ? status.maxPlayers : server.maxPlayers,
+      playersOnline: status.playersOnline,
+      maxPlayers: status.maxPlayers,
       statusError: status.error || null,
       lastCheckedAt: new Date()
     }
@@ -179,8 +218,8 @@ fastify.post('/admin/servers/check-all', async (request, reply) => {
           where: { id: server.id },
           data: {
             isOnline: status.isOnline,
-            playersOnline: status.isOnline ? status.playersOnline : server.playersOnline,
-            maxPlayers: status.isOnline ? status.maxPlayers : server.maxPlayers,
+            playersOnline: status.playersOnline,
+            maxPlayers: status.maxPlayers,
             statusError: status.error || null,
             lastCheckedAt: new Date()
           }
@@ -217,8 +256,8 @@ const start = async () => {
               where: { id: server.id },
               data: {
                 isOnline: status.isOnline,
-                playersOnline: status.isOnline ? status.playersOnline : server.playersOnline,
-                maxPlayers: status.isOnline ? status.maxPlayers : server.maxPlayers,
+                playersOnline: status.playersOnline,
+                maxPlayers: status.maxPlayers,
                 statusError: status.error || null,
                 lastCheckedAt: new Date()
               }
