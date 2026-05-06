@@ -38,9 +38,6 @@ function Navbar() {
         <Link to="/otservers-baiak" className="btn btn-secondary" style={{ border: 'none' }}>Baiak</Link>
         <Link to="/otservers-global" className="btn btn-secondary" style={{ border: 'none' }}>Global</Link>
         <Link to="/otservers-86" className="btn btn-secondary" style={{ border: 'none' }}>8.60</Link>
-        <Link to="/submit" className="btn btn-primary">
-          <Plus size={18} /> Adicionar Servidor
-        </Link>
       </div>
     </nav>
   );
@@ -278,95 +275,22 @@ function ServerDetails() {
 }
 
 function SubmitServer() {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-
-    try {
-      const response = await fetch(`${API_URL}/servers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) throw new Error('Submission failed');
-      
-      alert('Servidor enviado com sucesso! Ele será analisado pela equipe.');
-      navigate('/');
-    } catch (err) {
-      setError('Falha ao enviar servidor. Verifique os dados.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="app-container">
       <Navbar />
       <main>
-        <MonetizationBanner />
-        
-        <div className="form-container">
-          <h2 className="form-title">Cadastre seu OTServer</h2>
-          {error && <div style={{ color: 'var(--danger)', marginBottom: '1rem', textAlign: 'center' }}>{error}</div>}
-          
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">Nome do Servidor</label>
-              <input type="text" name="name" className="form-control" required placeholder="Ex: Mega OT" />
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">IP (Endereço)</label>
-                <input type="text" name="ip" className="form-control" required placeholder="go.megaot.com" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Porta</label>
-                <input type="number" name="port" className="form-control" required defaultValue="7171" />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Versão</label>
-                <input type="text" name="version" className="form-control" required placeholder="12.90" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Tipo</label>
-                <select name="type" className="form-control" required>
-                  <option value="RPG">RPG</option>
-                  <option value="PVP">PVP</option>
-                  <option value="PVP-Enforced">PVP-Enforced</option>
-                  <option value="Global">Global</option>
-                  <option value="Custom">Custom</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Website (Opcional)</label>
-              <input type="text" name="website" className="form-control" placeholder="https://megaot.com" />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Email do Dono</label>
-              <input type="email" name="ownerEmail" className="form-control" required placeholder="admin@megaot.com" />
-              <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>Para contato em caso de aprovação ou destaque.</small>
-            </div>
-
-            <button type="submit" className="btn btn-primary w-full mt-8" style={{ justifyContent: 'center' }} disabled={loading}>
-              <Shield size={18} /> {loading ? 'Enviando...' : 'Enviar Servidor para Análise'}
-            </button>
-          </form>
+        <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+          <Shield size={64} color="var(--text-muted)" style={{ margin: '0 auto 1.5rem' }} />
+          <h2 style={{ marginBottom: '1rem' }}>Cadastro Temporariamente Fechado</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
+            O cadastro público de servidores está temporariamente fechado.<br/>
+            Entre em contato pelo WhatsApp para cadastrar seu servidor.
+          </p>
+          <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ justifyContent: 'center', display: 'inline-flex' }}>
+            Falar no WhatsApp
+          </a>
+          <br/><br/>
+          <Link to="/" className="btn btn-secondary">Voltar para Home</Link>
         </div>
       </main>
     </div>
@@ -406,6 +330,36 @@ function Admin() {
 
   const [editingServer, setEditingServer] = useState<ServerData | null>(null);
   const [testResult, setTestResult] = useState<any>(null);
+  const [addingServer, setAddingServer] = useState(false);
+  const [newServer, setNewServer] = useState({
+    name: '', ip: '', port: 7171, version: '', type: 'Global',
+    website: '', ownerEmail: '', approved: true, isFeatured: false
+  });
+
+  const handleAddSave = async () => {
+    if (!newServer.name || !newServer.ip || !newServer.version || !newServer.ownerEmail) {
+      alert('Preencha nome, IP, versão e email.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/admin/servers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', secret },
+        body: JSON.stringify({ ...newServer, port: Number(newServer.port) })
+      });
+      if (res.ok) {
+        alert('Servidor adicionado com sucesso!');
+        setAddingServer(false);
+        setNewServer({ name: '', ip: '', port: 7171, version: '', type: 'Global', website: '', ownerEmail: '', approved: true, isFeatured: false });
+        fetchServers();
+      } else {
+        const text = await res.text();
+        alert(`Erro ao adicionar: ${res.status} ${text}`);
+      }
+    } catch (err) {
+      alert(`Erro de conexão: ${err}`);
+    }
+  };
 
   const handleEditSave = async () => {
     if (!editingServer) return;
@@ -537,9 +491,12 @@ function Admin() {
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           <button className={`btn ${tab === 'pending' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('pending')}>Pendentes</button>
           <button className={`btn ${tab === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('all')}>Todos os Servidores</button>
+          <button className="btn btn-secondary" style={{backgroundColor: '#22c55e', color: '#000'}} onClick={() => { setAddingServer(true); setTestResult(null); }}>
+            <Plus size={18} style={{marginRight: '0.5rem'}} /> Adicionar Servidor
+          </button>
           <button className="btn btn-secondary" style={{marginLeft: 'auto', backgroundColor: '#3b82f6', color: '#fff'}} onClick={handleCheckAll}>
             <Activity size={18} style={{marginRight: '0.5rem'}} /> Atualizar Todos
           </button>
@@ -681,8 +638,71 @@ function Admin() {
                 </div>
               )}
 
-              <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
                 <button className="btn btn-primary" onClick={handleEditSave}>Salvar Alterações</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {addingServer && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ backgroundColor: 'var(--bg-card)', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                <h3>Adicionar Servidor</h3>
+                <button className="btn" onClick={() => setAddingServer(false)}>Fechar</button>
+              </div>
+              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
+                <div><label>Nome</label><input className="form-control" placeholder="Ex: Mega OT" value={newServer.name} onChange={e => setNewServer({...newServer, name: e.target.value})} /></div>
+                <div><label>Email</label><input className="form-control" placeholder="admin@megaot.com" value={newServer.ownerEmail} onChange={e => setNewServer({...newServer, ownerEmail: e.target.value})} /></div>
+                <div><label>IP</label><input className="form-control" placeholder="go.megaot.com" value={newServer.ip} onChange={e => setNewServer({...newServer, ip: e.target.value})} /></div>
+                <div><label>Porta</label><input type="number" className="form-control" value={newServer.port} onChange={e => setNewServer({...newServer, port: parseInt(e.target.value)})} /></div>
+                <div><label>Versão</label><input className="form-control" placeholder="12.90" value={newServer.version} onChange={e => setNewServer({...newServer, version: e.target.value})} /></div>
+                <div>
+                  <label>Tipo</label>
+                  <select className="form-control" value={newServer.type} onChange={e => setNewServer({...newServer, type: e.target.value})}>
+                    <option value="RPG">RPG</option><option value="PVP">PVP</option><option value="PVP-Enforced">PVP-Enforced</option>
+                    <option value="Global">Global</option><option value="Custom">Custom</option><option value="Baiak">Baiak</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <label>Website</label>
+                <input className="form-control" placeholder="https://megaot.com" value={newServer.website} onChange={e => setNewServer({...newServer, website: e.target.value})} />
+              </div>
+              <div style={{ marginTop: '1rem', display: 'flex', gap: '2rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={newServer.approved} onChange={e => setNewServer({...newServer, approved: e.target.checked})} />
+                  Aprovado (aparecer na home)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={newServer.isFeatured} onChange={e => setNewServer({...newServer, isFeatured: e.target.checked})} />
+                  ⭐ Destaque Premium
+                </label>
+              </div>
+              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+                <button className="btn btn-secondary" onClick={() => testPort(newServer.ip, 7171)}>Testar 7171</button>
+                <button className="btn btn-secondary" onClick={() => testPort(newServer.ip, 7172)}>Testar 7172</button>
+                <button className="btn btn-secondary" onClick={() => testPort(newServer.ip, 7173)}>Testar 7173</button>
+              </div>
+              {testResult && (
+                <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                  {testResult.loading ? <span>Testando porta {testResult.port}...</span>
+                  : testResult.error ? <span style={{color: 'var(--danger)'}}>Porta {testResult.port} falhou: {testResult.error}</span>
+                  : (
+                    <div>
+                      <strong>Porta {testResult.port}:</strong>
+                      <span style={{ color: testResult.isOnline ? 'var(--success)' : 'var(--danger)', marginLeft: '0.5rem' }}>{testResult.isOnline ? 'Online' : 'Offline'}</span>
+                      {testResult.isOnline && ` (${testResult.playersOnline} players)`}
+                      {testResult.isOnline && (
+                        <button className="btn btn-primary" style={{marginLeft: '1rem', padding: '0.2rem 0.5rem'}} onClick={() => setNewServer({...newServer, port: testResult.port})}>Usar esta porta</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-primary" onClick={handleAddSave}>Criar Servidor</button>
               </div>
             </div>
           </div>

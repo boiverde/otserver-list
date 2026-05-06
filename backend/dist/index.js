@@ -33,33 +33,40 @@ fastify.get('/servers/:id', async (request, reply) => {
     }
     return server;
 });
-// Submit a new server
-fastify.post('/servers', async (request, reply) => {
+// Public submit — disabled (use admin panel)
+fastify.post('/servers', async (_request, reply) => {
+    return reply.status(403).send({ error: 'Cadastro público desativado. Entre em contato com o administrador.' });
+});
+// --- ADMIN ENDPOINTS ---
+// Admin: create server directly (approved by default)
+fastify.post('/admin/servers', async (request, reply) => {
+    const { secret } = request.headers;
+    if (secret !== process.env.ADMIN_SECRET)
+        return reply.status(401).send({ error: 'Unauthorized' });
     const data = request.body;
     try {
         const server = await prisma.server.create({
             data: {
-                name: data.name,
-                ip: data.ip,
-                port: parseInt(data.port, 10),
-                version: data.version,
-                type: data.type,
-                website: data.website || null,
-                playersOnline: data.playersOnline ? parseInt(data.playersOnline, 10) : 0,
-                maxPlayers: data.maxPlayers ? parseInt(data.maxPlayers, 10) : 0,
-                ownerEmail: data.ownerEmail,
-                approved: false,
-                isFeatured: false,
+                name: String(data.name),
+                ip: String(data.ip),
+                port: Number(data.port) || 7171,
+                version: String(data.version),
+                type: String(data.type || 'Custom'),
+                website: data.website ? String(data.website) : null,
+                ownerEmail: String(data.ownerEmail || 'admin@admin.com'),
+                playersOnline: 0,
+                maxPlayers: 0,
+                approved: data.approved !== undefined ? Boolean(data.approved) : true,
+                isFeatured: Boolean(data.isFeatured) || false,
             },
         });
         return reply.status(201).send(server);
     }
     catch (error) {
-        fastify.log.error(error);
-        return reply.status(400).send({ error: 'Invalid data' });
+        console.error('Admin create server error:', error);
+        return reply.status(400).send({ error: 'Dados inválidos' });
     }
 });
-// --- ADMIN ENDPOINTS ---
 fastify.get('/admin/servers/pending', async (request, reply) => {
     const { secret } = request.headers;
     if (secret !== process.env.ADMIN_SECRET)
