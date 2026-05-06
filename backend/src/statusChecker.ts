@@ -25,14 +25,67 @@ export async function checkServerStatus(ipStr: string, port: number, timeoutMs =
   return new Promise((resolve) => {
     const client = new net.Socket();
     let dataBuffer = '';
+    let resolved = false;
+
+    const processBuffer = (isTimeout: boolean) => {
+      if (resolved) return;
+      resolved = true;
+      client.destroy();
+
+      let isOnline = false;
+      let players = 0;
+      let max = 0;
+      let errorStr = isTimeout ? 'Timeout' : undefined;
+
+      try {
+        const onlineMatch = dataBuffer.match(/online="(\d+)"/i);
+        const maxMatch = dataBuffer.match(/max="(\d+)"/i);
+        const fallbackPlayers = dataBuffer.match(/players="(\d+)"/i);
+        const fallbackMax = dataBuffer.match(/maxplayers="(\d+)"/i);
+
+        const parsedPlayers = onlineMatch ? parseInt(onlineMatch[1], 10) : (fallbackPlayers ? parseInt(fallbackPlayers[1], 10) : null);
+        const parsedMax = maxMatch ? parseInt(maxMatch[1], 10) : (fallbackMax ? parseInt(fallbackMax[1], 10) : null);
+
+        players = parsedPlayers || 0;
+        max = parsedMax || 0;
+
+        if (players > 0) {
+          isOnline = true;
+          errorStr = undefined;
+        } else if (dataBuffer.includes('<?xml') || dataBuffer.includes('serverinfo') || dataBuffer.includes('tsqp') || dataBuffer.includes('tsq')) {
+          isOnline = true;
+          errorStr = undefined;
+        } else if (dataBuffer.length > 0) {
+          errorStr = 'Invalid response format';
+        }
+      } catch (err) {
+        errorStr = 'Parse error';
+      }
+
+      console.log({
+        host: ipStr,
+        playersOnline: players,
+        receivedDataLength: dataBuffer.length,
+        isOnline,
+        timeout: isTimeout
+      });
+
+      resolve({
+        isOnline,
+        playersOnline: players,
+        maxPlayers: max,
+        error: errorStr
+      });
+    };
 
     const timeout = setTimeout(() => {
-      client.destroy();
-      resolve({ isOnline: false, playersOnline: 0, maxPlayers: 0, error: 'Timeout' });
+      processBuffer(true);
     }, timeoutMs);
 
     client.on('error', (err) => {
       clearTimeout(timeout);
+      if (resolved) return;
+      resolved = true;
       client.destroy();
       resolve({ isOnline: false, playersOnline: 0, maxPlayers: 0, error: err.message });
     });
@@ -46,40 +99,15 @@ export async function checkServerStatus(ipStr: string, port: number, timeoutMs =
     client.on('data', (data) => {
       dataBuffer += data.toString();
       
-      // Some servers do not close the connection after sending info
       if (dataBuffer.includes('</tsq>') || dataBuffer.includes('</tsqp>') || dataBuffer.includes('</serverinfo>')) {
-        client.destroy();
         clearTimeout(timeout);
-        
-        try {
-          // Parse XML looking for <players online="X" ... max="Y" ... />
-          const onlineMatch = dataBuffer.match(/online="(\d+)"/i);
-          const maxMatch = dataBuffer.match(/max="(\d+)"/i);
-
-          // Fallback for older formats like players="X" maxplayers="Y"
-          const fallbackPlayers = dataBuffer.match(/players="(\d+)"/i);
-          const fallbackMax = dataBuffer.match(/maxplayers="(\d+)"/i);
-
-          const players = onlineMatch ? parseInt(onlineMatch[1], 10) : (fallbackPlayers ? parseInt(fallbackPlayers[1], 10) : null);
-          const max = maxMatch ? parseInt(maxMatch[1], 10) : (fallbackMax ? parseInt(fallbackMax[1], 10) : null);
-
-          if (players !== null && max !== null) {
-            resolve({
-              isOnline: true,
-              playersOnline: players,
-              maxPlayers: max,
-            });
-          } else {
-            resolve({ isOnline: false, playersOnline: 0, maxPlayers: 0, error: 'Invalid response format' });
-          }
-        } catch (err) {
-          resolve({ isOnline: false, playersOnline: 0, maxPlayers: 0, error: 'Parse error' });
-        }
+        processBuffer(false);
       }
     });
 
     client.on('end', () => {
-      // Handled in data event
+      clearTimeout(timeout);
+      processBuffer(false);
     });
   });
 }
