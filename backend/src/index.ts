@@ -243,6 +243,7 @@ const start = async () => {
   try {
     await fastify.listen({ port: process.env.PORT ? parseInt(process.env.PORT) : 3000, host: '0.0.0.0' });
     console.log(`Server is running on port ${process.env.PORT || 3000}`);
+    console.log("ADMIN ROUTES LOADED");
     
     // Auto status check every 5 minutes
     setInterval(async () => {
